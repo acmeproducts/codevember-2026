@@ -251,6 +251,25 @@ function SceneWarmup({ phase, onCompiling, onReady, judge }: { phase: RefObject<
   return null;
 }
 
+// A lighter way of drawing a day, remembered on this device once that day has lost the GPU: the smallest picture and
+// the simplest tier, on the older WebGL2 where the day can draw with it. Phones lose the GPU when a scene asks more of
+// their graphics driver than it can give, and the same scene asked the same way loses it again.
+const WEBGPU_ONLY = [7, 11];
+const liteKey = (day: CodevemberDay) => `cv-lite-${day.day}`;
+const isLite = (day: CodevemberDay) => {
+  try {
+    return window.localStorage.getItem(liteKey(day)) === "1";
+  } catch {
+    return false;
+  }
+};
+const setLite = (day: CodevemberDay, on: boolean) => {
+  try {
+    if (on) window.localStorage.setItem(liteKey(day), "1");
+    else window.localStorage.removeItem(liteKey(day));
+  } catch {}
+};
+
 // Why no renderer could be started, in words for whoever is holding the phone.
 async function graphicsReport() {
   let webgpu = "not offered";
@@ -273,11 +292,13 @@ async function graphicsReport() {
 export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (step: LoadStep) => void }) {
   const [loaded, setLoaded] = useState<LoadedDay | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [choice, setChoice] = useState<QualityChoice>("auto");
+  const [lite] = useState(() => isLite(day));
+  const [lost, setLost] = useState(false);
+  const [choice, setChoice] = useState<QualityChoice>(lite ? "low" : "auto");
   const [autoTier, setAutoTier] = useState<QualityTier>(initialTier);
   const [isWebGPU, setIsWebGPU] = useState(true);
   // Held here, not set on the renderer, because the canvas puts its dpr prop back whenever this component renders.
-  const [dpr, setDpr] = useState(topDpr);
+  const [dpr, setDpr] = useState(() => (lite ? 1 : topDpr()));
   const fpsRef = useRef<HTMLElement | null>(null);
   const phase = scenePhase;
   const loadId = useRef(0);
@@ -377,12 +398,13 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
           let found: THREE.WebGPURenderer | null = null;
           for (let attempt = 0; attempt < 4 && !found; attempt += 1) {
             if (attempt) await new Promise((resolve) => setTimeout(resolve, 800));
+            const webglFirst = lite && !WEBGPU_ONLY.includes(day.day);
             try {
-              found = await make(false);
+              found = await make(webglFirst);
             } catch (failure) {
               console.error(failure);
               try {
-                found = await make(true);
+                found = await make(!webglFirst);
               } catch (again) {
                 console.error(again);
               }
@@ -392,9 +414,11 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
           const renderer = found;
           // Leaving the page gives its graphics memory back at once, rather than whenever the browser gets round to it,
           // so the next day has room to start. A page brought back from the browser's cache starts afresh.
+          let leaving = false;
           window.addEventListener(
             "pagehide",
             () => {
+              leaving = true;
               try {
                 (renderer.getContext() as unknown as WebGL2RenderingContext | null)?.getExtension?.("WEBGL_lose_context")?.loseContext();
                 (renderer.backend as unknown as { device?: { destroy?: () => void } }).device?.destroy?.();
@@ -406,7 +430,15 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
             if (event.persisted) window.location.reload();
           });
           (renderer as unknown as { onDeviceLost: (info: { message: string }) => void }).onDeviceLost = (info) => {
-            setError(`The GPU connection was lost (${info.message}). Reload to continue.`);
+            // Not the page's own doing, on the way out.
+            if (leaving) return;
+            setLite(day, true);
+            setLost(true);
+            setError(
+              lite
+                ? `This phone's graphics gave out again, even in the lighter mode (${info.message}). Close and reopen the browser, then try once more.`
+                : `This phone's graphics gave out on this scene (${info.message}). It will open in a lighter mode next.`
+            );
           };
           setIsWebGPU((renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend === true);
           return renderer as never;
@@ -450,8 +482,26 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
       {error ? (
         <div className="cv-error" role="alert">
           <p>{error}</p>
+          {lost ? (
+            <button type="button" className="cv-pill" onClick={() => window.location.reload()}>
+              {lite ? "Try again" : "Open in lighter mode"}
+            </button>
+          ) : null}
           <a href={dayHref(days[0]).replace(/[^/]+\/$/, "")}>All days</a>
         </div>
+      ) : null}
+
+      {lite && !error ? (
+        <button
+          type="button"
+          className="cv-lite"
+          onClick={() => {
+            setLite(day, false);
+            window.location.reload();
+          }}
+        >
+          Lighter mode · tap for full quality
+        </button>
       ) : null}
 
       <Hud
