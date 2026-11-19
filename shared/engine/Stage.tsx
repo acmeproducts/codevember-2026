@@ -256,17 +256,22 @@ function SceneWarmup({ phase, onCompiling, onReady, judge }: { phase: RefObject<
 // their graphics driver than it can give, and the same scene asked the same way loses it again.
 const WEBGPU_ONLY = [7, 11];
 const liteKey = (day: CodevemberDay) => `cv-lite-${day.day}`;
+// Days that run compute shaders and are known to draw on WebGL2 too. Compute on WebGPU is what has brought down the
+// graphics of Android phones, taking the browser's with it until it is restarted, so there these start lighter unless
+// the visitor has asked for full quality.
+const LITE_FIRST = [16, 18];
 const isLite = (day: CodevemberDay) => {
+  const byDefault = LITE_FIRST.includes(day.day) && /Android/i.test(navigator.userAgent);
   try {
-    return window.localStorage.getItem(liteKey(day)) === "1";
+    const kept = window.localStorage.getItem(liteKey(day));
+    return kept === "1" || (kept === null && byDefault);
   } catch {
-    return false;
+    return byDefault;
   }
 };
 const setLite = (day: CodevemberDay, on: boolean) => {
   try {
-    if (on) window.localStorage.setItem(liteKey(day), "1");
-    else window.localStorage.removeItem(liteKey(day));
+    window.localStorage.setItem(liteKey(day), on ? "1" : "0");
   } catch {}
 };
 
@@ -294,11 +299,12 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
   const [error, setError] = useState<string | null>(null);
   const [lite] = useState(() => isLite(day));
   const [lost, setLost] = useState(false);
-  const [choice, setChoice] = useState<QualityChoice>(lite ? "low" : "auto");
+  const shrink = lite && WEBGPU_ONLY.includes(day.day);
+  const [choice, setChoice] = useState<QualityChoice>(shrink ? "low" : "auto");
   const [autoTier, setAutoTier] = useState<QualityTier>(initialTier);
   const [isWebGPU, setIsWebGPU] = useState(true);
   // Held here, not set on the renderer, because the canvas puts its dpr prop back whenever this component renders.
-  const [dpr, setDpr] = useState(() => (lite ? 1 : topDpr()));
+  const [dpr, setDpr] = useState(() => (shrink ? 1 : topDpr()));
   const fpsRef = useRef<HTMLElement | null>(null);
   const phase = scenePhase;
   const loadId = useRef(0);
