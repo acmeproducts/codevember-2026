@@ -251,6 +251,23 @@ function SceneWarmup({ phase, onCompiling, onReady, judge }: { phase: RefObject<
   return null;
 }
 
+// Why no renderer could be started, in words for whoever is holding the phone.
+async function graphicsReport() {
+  let webgpu = "not offered";
+  try {
+    const gpu = (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+    if (gpu) webgpu = (await gpu.requestAdapter()) ? "refused" : "no adapter";
+  } catch {
+    webgpu = "failed";
+  }
+  let webgl = "refused";
+  try {
+    if (document.createElement("canvas").getContext("webgl2")) webgl = "available on a new page";
+  } catch {}
+  return `The browser would not give this page any graphics (WebGPU: ${webgpu}; WebGL2: ${webgl}). It has usually run out of graphics memory: close other tabs, or close and reopen the browser, then try again.`;
+}
+
+
 // The renderer lives for the whole visit. Moving between days swaps the scene under a fade,
 // so there is no new GPU device, canvas or page load between them.
 export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (step: LoadStep) => void }) {
@@ -343,15 +360,51 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
         // Well past any sky dome plus the furthest the camera can get from it, or zooming out cuts a black hole in the sky.
         camera={{ fov: 36, near: 0.05, far: 400 }}
         gl={async (props) => {
-          let renderer = new THREE.WebGPURenderer({ ...(props as object), antialias: false, alpha: false });
-          try {
-            await renderer.init();
-          } catch (failure) {
-            // Phones can refuse WebGPU when short of memory. The WebGL backend often still gets through.
-            console.error(failure);
-            renderer = new THREE.WebGPURenderer({ ...(props as object), antialias: false, alpha: false, forceWebGL: true });
-            await renderer.init();
+          const make = async (forceWebGL: boolean) => {
+            const made = new THREE.WebGPURenderer({ ...(props as object), antialias: false, alpha: false, forceWebGL });
+            try {
+              await made.init();
+            } catch (failure) {
+              try {
+                made.dispose();
+              } catch {}
+              throw failure;
+            }
+            return made;
+          };
+          // Phones can refuse WebGPU when short of memory. The WebGL backend often still gets through, and when neither
+          // does, the browser is usually still letting go of the last page's graphics: a moment later it has room.
+          let found: THREE.WebGPURenderer | null = null;
+          for (let attempt = 0; attempt < 4 && !found; attempt += 1) {
+            if (attempt) await new Promise((resolve) => setTimeout(resolve, 800));
+            try {
+              found = await make(false);
+            } catch (failure) {
+              console.error(failure);
+              try {
+                found = await make(true);
+              } catch (again) {
+                console.error(again);
+              }
+            }
           }
+          if (!found) throw new Error(await graphicsReport());
+          const renderer = found;
+          // Leaving the page gives its graphics memory back at once, rather than whenever the browser gets round to it,
+          // so the next day has room to start. A page brought back from the browser's cache starts afresh.
+          window.addEventListener(
+            "pagehide",
+            () => {
+              try {
+                (renderer.getContext() as unknown as WebGL2RenderingContext | null)?.getExtension?.("WEBGL_lose_context")?.loseContext();
+                (renderer.backend as unknown as { device?: { destroy?: () => void } }).device?.destroy?.();
+              } catch {}
+            },
+            { once: true }
+          );
+          window.addEventListener("pageshow", (event) => {
+            if (event.persisted) window.location.reload();
+          });
           (renderer as unknown as { onDeviceLost: (info: { message: string }) => void }).onDeviceLost = (info) => {
             setError(`The GPU connection was lost (${info.message}). Reload to continue.`);
           };
