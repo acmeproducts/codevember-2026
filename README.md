@@ -7,117 +7,113 @@ Creating a fun, interactive three.js experience every day of November. One word,
     <td align="center" valign="top">
       <a href="01-fold"><img src="videos/01-fold.gif" alt="Fold" width="260"></a><br>
       <b>Day 1: <a href="01-fold">Fold</a></b><br>
-      <a href="01-fold">Code</a> · <a href="https://adamwebsite.com/codevember/01-fold/">Live</a>
+      <a href="01-fold">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/01-fold.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="02-shatter"><img src="videos/02-shatter.gif" alt="Shatter" width="260"></a><br>
       <b>Day 2: <a href="02-shatter">Shatter</a></b><br>
-      <a href="02-shatter">Code</a> · <a href="https://adamwebsite.com/codevember/02-shatter/">Live</a>
+      <a href="02-shatter">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/02-shatter.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="03-melt"><img src="videos/03-melt.gif" alt="Melt" width="260"></a><br>
       <b>Day 3: <a href="03-melt">Melt</a></b><br>
-      <a href="03-melt">Code</a> · <a href="https://adamwebsite.com/codevember/03-melt/">Live</a>
+      <a href="03-melt">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/03-melt.html">Live</a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <a href="04-tangle"><img src="videos/04-tangle.gif" alt="Tangle" width="260"></a><br>
       <b>Day 4: <a href="04-tangle">Tangle</a></b><br>
-      <a href="04-tangle">Code</a> · <a href="https://adamwebsite.com/codevember/04-tangle/">Live</a>
+      <a href="04-tangle">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/04-tangle.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="05-moss"><img src="videos/05-moss.gif" alt="Moss" width="260"></a><br>
       <b>Day 5: <a href="05-moss">Moss</a></b><br>
-      <a href="05-moss">Code</a> · <a href="https://adamwebsite.com/codevember/05-moss/">Live</a>
+      <a href="05-moss">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/05-moss.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="06-orrery"><img src="videos/06-orrery.gif" alt="Orrery" width="260"></a><br>
       <b>Day 6: <a href="06-orrery">Orrery</a></b><br>
-      <a href="06-orrery">Code</a> · <a href="https://adamwebsite.com/codevember/06-orrery/">Live</a>
+      <a href="06-orrery">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/06-orrery.html">Live</a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <a href="07-hollow"><img src="videos/07-hollow.gif" alt="Hollow" width="260"></a><br>
       <b>Day 7: <a href="07-hollow">Hollow</a></b><br>
-      <a href="07-hollow">Code</a> · <a href="https://adamwebsite.com/codevember/07-hollow/">Live</a>
+      <a href="07-hollow">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/07-hollow.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="08-tesseract"><img src="videos/08-tesseract.gif" alt="Tesseract" width="260"></a><br>
       <b>Day 8: <a href="08-tesseract">Tesseract</a></b><br>
-      <a href="08-tesseract">Code</a> · <a href="https://adamwebsite.com/codevember/08-tesseract/">Live</a>
+      <a href="08-tesseract">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/08-tesseract.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="09-membrane"><img src="videos/09-membrane.gif" alt="Membrane" width="260"></a><br>
       <b>Day 9: <a href="09-membrane">Membrane</a></b><br>
-      <a href="09-membrane">Code</a> · <a href="https://adamwebsite.com/codevember/09-membrane/">Live</a>
+      <a href="09-membrane">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/09-membrane.html">Live</a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <a href="10-caustic"><img src="videos/10-caustic.gif" alt="Caustic" width="260"></a><br>
       <b>Day 10: <a href="10-caustic">Caustic</a></b><br>
-      <a href="10-caustic">Code</a> · <a href="https://adamwebsite.com/codevember/10-caustic/">Live</a>
+      <a href="10-caustic">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/10-caustic.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="11-rust"><img src="videos/11-rust.gif" alt="Rust" width="260"></a><br>
       <b>Day 11: <a href="11-rust">Rust</a></b><br>
-      <a href="11-rust">Code</a> · <a href="https://adamwebsite.com/codevember/11-rust/">Live</a>
+      <a href="11-rust">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/11-rust.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="12-feather"><img src="videos/12-feather.gif" alt="Feather" width="260"></a><br>
       <b>Day 12: <a href="12-feather">Feather</a></b><br>
-      <a href="12-feather">Code</a> · <a href="https://adamwebsite.com/codevember/12-feather/">Live</a>
+      <a href="12-feather">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/12-feather.html">Live</a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <a href="13-labyrinth"><img src="videos/13-labyrinth.gif" alt="Labyrinth" width="260"></a><br>
       <b>Day 13: <a href="13-labyrinth">Labyrinth</a></b><br>
-      <a href="13-labyrinth">Code</a> · <a href="https://adamwebsite.com/codevember/13-labyrinth/">Live</a>
+      <a href="13-labyrinth">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/13-labyrinth.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="14-tension"><img src="videos/14-tension.gif" alt="Tension" width="260"></a><br>
       <b>Day 14: <a href="14-tension">Tension</a></b><br>
-      <a href="14-tension">Code</a> · <a href="https://adamwebsite.com/codevember/14-tension/">Live</a>
+      <a href="14-tension">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/14-tension.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="15-mirage"><img src="videos/15-mirage.gif" alt="Mirage" width="260"></a><br>
       <b>Day 15: <a href="15-mirage">Mirage</a></b><br>
-      <a href="15-mirage">Code</a> · <a href="https://adamwebsite.com/codevember/15-mirage/">Live</a>
+      <a href="15-mirage">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/15-mirage.html">Live</a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <a href="16-spore"><img src="videos/16-spore.gif" alt="Spore" width="260"></a><br>
       <b>Day 16: <a href="16-spore">Spore</a></b><br>
-      <a href="16-spore">Code</a> · <a href="https://adamwebsite.com/codevember/16-spore/">Live</a>
+      <a href="16-spore">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/16-spore.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="17-kelp"><img src="videos/17-kelp.gif" alt="Kelp" width="260"></a><br>
       <b>Day 17: <a href="17-kelp">Kelp</a></b><br>
-      <a href="17-kelp">Code</a> · <a href="https://adamwebsite.com/codevember/17-kelp/">Live</a>
+      <a href="17-kelp">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/17-kelp.html">Live</a>
     </td>
     <td align="center" valign="top">
       <a href="18-pendulum"><img src="videos/18-pendulum.gif" alt="Pendulum" width="260"></a><br>
       <b>Day 18: <a href="18-pendulum">Pendulum</a></b><br>
-      <a href="18-pendulum">Code</a> · <a href="https://adamwebsite.com/codevember/18-pendulum/">Live</a>
+      <a href="18-pendulum">Code</a> · <a href="https://acmeproducts.github.io/codevember-2026/HTML5/18-pendulum.html">Live</a>
     </td>
   </tr>
 </table>
 
-## Quick start
+## Open it
 
-```bash
-npm i
-npm run build
-npm start
-```
+No install and no build: every day is a ready-made page in [`HTML5/`](HTML5).
 
-Then open <http://localhost:3000>.
+**<https://acmeproducts.github.io/codevember-2026/>**
 
-You need [Node.js](https://nodejs.org) 20.9 or newer, and a browser with WebGPU, such as a recent Chrome, Edge or Safari. Days fall back to WebGL2 where they can, with a simpler look.
+You need a browser with WebGPU, such as a recent Chrome, Edge or Safari. Days fall back to WebGL2 where they can, with a simpler look.
 
 ## Days
 
@@ -179,7 +175,7 @@ videos/                 A recording of each day, as a GIF
 scripts/                Build helpers
 ```
 
-## Scripts
+## Working on the source (optional)
 
 | Command | What it does |
 | --- | --- |
