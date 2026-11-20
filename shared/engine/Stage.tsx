@@ -388,7 +388,16 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
         camera={{ fov: 36, near: 0.05, far: 400 }}
         gl={async (props) => {
           const make = async (forceWebGL: boolean) => {
-            const made = new THREE.WebGPURenderer({ ...(props as object), antialias: false, alpha: false, forceWebGL });
+            // three asks for every optional feature the phone offers (subgroups, 16-bit floats and so on). In lighter mode
+            // on a day that can only use WebGPU, ask for none, in case one of them is what the phone's driver chokes on.
+            let device: unknown;
+            if (!forceWebGL && lite && WEBGPU_ONLY.includes(day.day)) {
+              try {
+                const adapter = await (navigator as unknown as { gpu: { requestAdapter: () => Promise<{ requestDevice: () => Promise<unknown> } | null> } }).gpu.requestAdapter();
+                device = await adapter?.requestDevice();
+              } catch {}
+            }
+            const made = new THREE.WebGPURenderer({ ...(props as object), ...(device ? { device } : {}), antialias: false, alpha: false, forceWebGL });
             try {
               await made.init();
             } catch (failure) {
@@ -440,10 +449,17 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
             if (leaving) return;
             setLite(day, true);
             setLost(true);
+            // Where in the visit it happened, kept for the test page and shown below the message.
+            const where = `day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
+            try {
+              const log = JSON.parse(window.localStorage.getItem("cv-crashlog") || "[]");
+              log.push(`${where}: ${info.message.slice(0, 120)}`);
+              window.localStorage.setItem("cv-crashlog", JSON.stringify(log.slice(-8)));
+            } catch {}
             setError(
               lite
-                ? `This phone's graphics gave out again, even in the lighter mode (${info.message}). Close and reopen the browser, then try once more.`
-                : `This phone's graphics gave out on this scene (${info.message}). It will open in a lighter mode next.`
+                ? `This phone's graphics gave out again, even in the lighter mode (${where}). Close and reopen the browser, then try once more.`
+                : `This phone's graphics gave out on this scene (${where}). It will open in a lighter mode next.`
             );
           };
           setIsWebGPU((renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend === true);

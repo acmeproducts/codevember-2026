@@ -20,6 +20,8 @@
 <div id="warn"></div>
 <button id="all">Run all</button><button id="reset">Clear results</button>
 <div id="rows"></div>
+<p>Last crashes seen on the days</p>
+<pre id="log">none</pre>
 <p>Phone info</p>
 <pre id="info">…</pre>
 <script>
@@ -144,6 +146,7 @@ save(state);
 $("all").onclick = async () => { for (let i = 0; i < TESTS.length; i++) { await runOne(i); if (state[i].status !== "ok") break; } };
 $("reset").onclick = () => { state = {}; save(state); $("warn").innerHTML = ""; draw(); };
 draw();
+try { const l = JSON.parse(localStorage.getItem("cv-crashlog") || "[]"); if (l.length) $("log").textContent = l.join("\n"); } catch {}
 
 (async () => {
   const lines = [navigator.userAgent];
