@@ -21,6 +21,8 @@ export const useQuality = () => useContext(QualityContext);
 
 export const initialTier = (): QualityTier => {
   if (typeof window === "undefined") return "medium";
+  // An Android phone asked for a desktop page still has a phone's graphics.
+  if (/Android/i.test(navigator.userAgent)) return "low";
   const coarse = window.matchMedia("(pointer: coarse)").matches;
   const small = Math.min(window.innerWidth, window.innerHeight) < 600;
   if (coarse && small) return "low";
