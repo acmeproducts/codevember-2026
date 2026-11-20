@@ -9,10 +9,6 @@ import { narrowScreen, type QualityChoice } from "../engine/quality";
 import type { SettingsStore } from "../engine/settings";
 import type { ColourSetting, OverviewSection, QualityTier, Setting } from "../engine/types";
 import { resetPrompt, usePromptDone } from "../engine/prompt";
-import { GithubIcon, REPO } from "./github";
-import { FollowCard } from "./Follow";
-import { ShareButton } from "./Share";
-import { LINKEDIN_URL, LinkedInIcon, X_URL, XIcon } from "./social";
 import { track } from "../engine/track";
 import { sound, useSoundOn } from "../engine/sound";
 import { SETTLE, TextMotion, fade, inTurn, rise, riseBig } from "./motion";
@@ -571,16 +567,6 @@ export function Hud({ day, hint, prompt, notes, overview, Overlay, settings, pho
           </div>
         ) : null}
         <div className="cv-bar-actions">
-        <a className="cv-pill cv-round" href={REPO} target="_blank" rel="noreferrer" aria-label="The code on GitHub" onClick={() => track("bar-github")}>
-          <GithubIcon />
-        </a>
-        <a className="cv-pill cv-round" href={X_URL} target="_blank" rel="noreferrer" aria-label="Adam on X" onClick={() => track("bar-x")}>
-          <XIcon />
-        </a>
-        <a className="cv-pill cv-round" href={LINKEDIN_URL} target="_blank" rel="noreferrer" aria-label="Adam on LinkedIn" onClick={() => track("bar-linkedin")}>
-          <LinkedInIcon />
-        </a>
-        <ShareButton day={day} />
         <button type="button" className="cv-pill" aria-pressed={soundOn} onClick={() => sound.toggle()}>
           <Swap text={soundOn ? "Sound on" : "Sound off"} />
         </button>
@@ -700,19 +686,6 @@ export function Hud({ day, hint, prompt, notes, overview, Overlay, settings, pho
           </motion.div>
         ) : null}
       </AnimatePresence>
-
-      <FollowCard dayNumber={day.day} />
-
-      <motion.p className="cv-credit" variants={fade} initial="hidden" animate="show">
-        Built with{" "}
-        <a href="https://r3f.docs.pmnd.rs/" target="_blank" rel="noreferrer">
-          React Three Fiber
-        </a>{" "}
-        +{" "}
-        <a href="https://r3f.docs.pmnd.rs/tutorials/v9-migration-guide#webgpu" target="_blank" rel="noreferrer">
-          WebGPU
-        </a>
-      </motion.p>
 
       <footer className="cv-foot">
         {previous ? (

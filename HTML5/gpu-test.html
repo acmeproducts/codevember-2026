@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codevember GPU test</title>
+<style>
+  body{margin:0;padding:16px;background:#08090c;color:#eee;font:15px/1.45 system-ui,sans-serif}
+  h1{font-size:19px;margin:0 0 4px}
+  p{margin:6px 0;color:#aab}
+  button{font:inherit;color:#eee;background:#1d2029;border:1px solid #3a3f4d;border-radius:999px;padding:10px 16px;margin:6px 6px 6px 0}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #20232c}
+  .ok{color:#7fe0a0}.bad{color:#ff8a80}.run{color:#ffd37a}
+  pre{white-space:pre-wrap;word-break:break-word;background:#11131a;padding:10px;border-radius:8px;font-size:12px}
+</style>
+</head>
+<body>
+<h1>GPU test</h1>
+<p>Runs one small GPU job at a time. If the phone's graphics crash on one, the page says which one when you reopen it.</p>
+<div id="warn"></div>
+<button id="all">Run all</button><button id="reset">Clear results</button>
+<div id="rows"></div>
+<p>Phone info</p>
+<pre id="info">…</pre>
+<script>
+const $ = (id) => document.getElementById(id);
+const KEY = "cv-gputest";
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; } };
+const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+let state = load();
+const frames = (n) => new Promise((res) => { let i = 0; const f = () => (++i >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+
+let dev = null;
+async function device() {
+  if (dev && !dev.lost_) return dev;
+  if (!navigator.gpu) throw new Error("This browser has no WebGPU");
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error("No graphics adapter offered");
+  dev = await adapter.requestDevice();
+  dev.lost.then((i) => { dev.lost_ = true; dev.lostMsg = i.message; });
+  return dev;
+}
+const check = async (d) => { await d.queue.onSubmittedWorkDone(); if (d.lost_) throw new Error("GPU lost: " + d.lostMsg); };
+
+function pipeline(d, code) {
+  return d.createComputePipeline({ layout: "auto", compute: { module: d.createShaderModule({ code }), entryPoint: "main" } });
+}
+
+const TESTS = [
+  ["Tiny compute job", async (d) => {
+    const p = pipeline(d, `@group(0)@binding(0) var<storage,read_write> a: array<f32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) i: vec3u){ a[i.x] = f32(i.x) * 2.0; }`);
+    const b = d.createBuffer({ size: 4096 * 4, usage: GPUBufferUsage.STORAGE });
+    const g = d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }] });
+    const e = d.createCommandEncoder(); const c = e.beginComputePass(); c.setPipeline(p); c.setBindGroup(0, g); c.dispatchWorkgroups(64); c.end();
+    d.queue.submit([e.finish()]); await check(d);
+  }],
+  ["Big buffer compute, 120 frames", async (d) => {
+    const N = 1 << 21;
+    const p = pipeline(d, `@group(0)@binding(0) var<storage,read_write> a: array<vec4f>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) i: vec3u){ if (i.x < ${N}u) { a[i.x] = a[i.x] * 0.99 + vec4f(sin(f32(i.x)), 1.0, 0.5, 0.1); } }`);
+    const b = d.createBuffer({ size: N * 16, usage: GPUBufferUsage.STORAGE });
+    const g = d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: b } }] });
+    for (let f = 0; f < 120; f++) {
+      const e = d.createCommandEncoder(); const c = e.beginComputePass(); c.setPipeline(p); c.setBindGroup(0, g); c.dispatchWorkgroups(N / 64); c.end();
+      d.queue.submit([e.finish()]); await frames(1);
+    }
+    await check(d);
+  }],
+  ["Atomic counting sort, 1.5M, 60 frames", async (d) => {
+    const N = 1500000, BINS = 4096;
+    const p = pipeline(d, `@group(0)@binding(0) var<storage,read_write> bins: array<atomic<u32>>;
+      @group(0)@binding(1) var<storage,read_write> keys: array<u32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) i: vec3u){ if (i.x < ${N}u) { let k = (i.x * 2654435761u) % ${BINS}u; keys[i.x] = atomicAdd(&bins[k], 1u); } }`);
+    const bins = d.createBuffer({ size: BINS * 4, usage: GPUBufferUsage.STORAGE });
+    const keys = d.createBuffer({ size: N * 4, usage: GPUBufferUsage.STORAGE });
+    const g = d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bins } }, { binding: 1, resource: { buffer: keys } }] });
+    for (let f = 0; f < 60; f++) {
+      const e = d.createCommandEncoder(); const c = e.beginComputePass(); c.setPipeline(p); c.setBindGroup(0, g); c.dispatchWorkgroups(Math.ceil(N / 64)); c.end();
+      d.queue.submit([e.finish()]); await frames(1);
+    }
+    await check(d);
+  }],
+  ["Storage texture write, 256x256 half-float, 120 frames", async (d) => {
+    const S = 256;
+    const tex = d.createTexture({ size: [S, S], format: "rgba16float", usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING });
+    const p = pipeline(d, `@group(0)@binding(0) var t: texture_storage_2d<rgba16float, write>;
+      @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i: vec3u){ textureStore(t, vec2i(i.xy), vec4f(f32(i.x) / ${S}.0, f32(i.y) / ${S}.0, 0.5, 1.0)); }`);
+    const g = d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: tex.createView() }] });
+    for (let f = 0; f < 120; f++) {
+      const e = d.createCommandEncoder(); const c = e.beginComputePass(); c.setPipeline(p); c.setBindGroup(0, g); c.dispatchWorkgroups(S / 8, S / 8); c.end();
+      d.queue.submit([e.finish()]); await frames(1);
+    }
+    await check(d);
+  }],
+  ["Ocean-like: 14 storage-texture passes a frame, 120 frames", async (d) => {
+    const S = 256;
+    const mk = () => d.createTexture({ size: [S, S], format: "rgba16float", usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING });
+    const A = mk(), B = mk();
+    const p = pipeline(d, `@group(0)@binding(0) var src: texture_2d<f32>;
+      @group(0)@binding(1) var dst: texture_storage_2d<rgba16float, write>;
+      @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i: vec3u){
+        var acc = vec4f(0.0);
+        for (var k = 0; k < 8; k++) { acc += textureLoad(src, vec2i((i.xy + vec2u(u32(k) * 7u, u32(k) * 3u)) % ${S}u), 0) * 0.125; }
+        textureStore(dst, vec2i(i.xy), acc + vec4f(0.01, 0.02, 0.0, 0.0)); }`);
+    const bg = (s, t) => d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: s.createView() }, { binding: 1, resource: t.createView() }] });
+    const ab = bg(A, B), ba = bg(B, A);
+    for (let f = 0; f < 120; f++) {
+      const e = d.createCommandEncoder();
+      for (let k = 0; k < 14; k++) { const c = e.beginComputePass(); c.setPipeline(p); c.setBindGroup(0, k % 2 ? ba : ab); c.dispatchWorkgroups(S / 8, S / 8); c.end(); }
+      d.queue.submit([e.finish()]); await frames(1);
+    }
+    await check(d);
+  }],
+];
+
+function draw() {
+  $("rows").innerHTML = TESTS.map(([name], i) => {
+    const r = state[i];
+    const text = !r ? "not run" : r.status === "running" ? "running…" : r.status === "ok" ? "passed" : r.status === "crash" ? "CRASHED the graphics" : "failed: " + r.note;
+    const cls = !r ? "" : r.status === "ok" ? "ok" : r.status === "running" ? "run" : "bad";
+    return `<div class="row"><span>${name}</span><span class="${cls}">${text}</span></div><button data-i="${i}">Run this one</button>`;
+  }).join("");
+  document.querySelectorAll("button[data-i]").forEach((b) => (b.onclick = () => runOne(+b.dataset.i)));
+}
+
+async function runOne(i) {
+  state[i] = { status: "running" }; save(state); draw();
+  try {
+    const d = await device();
+    await TESTS[i][1](d);
+    state[i] = { status: "ok" };
+  } catch (e) {
+    state[i] = { status: "fail", note: String(e.message || e).slice(0, 160) };
+    dev = null;
+  }
+  save(state); draw();
+}
+
+// A test still marked running when the page opens is one that took the page, or the whole browser, down with it.
+Object.keys(state).forEach((i) => { if (state[i].status === "running") { state[i] = { status: "crash" }; $("warn").innerHTML = `<p class="bad">Last time, “${TESTS[i][0]}” crashed the graphics. Close and reopen the browser before running more.</p>`; } });
+save(state);
+
+$("all").onclick = async () => { for (let i = 0; i < TESTS.length; i++) { await runOne(i); if (state[i].status !== "ok") break; } };
+$("reset").onclick = () => { state = {}; save(state); $("warn").innerHTML = ""; draw(); };
+draw();
+
+(async () => {
+  const lines = [navigator.userAgent];
+  try {
+    const a = await navigator.gpu?.requestAdapter();
+    if (!a) { lines.push("WebGPU: no adapter"); }
+    else {
+      const i = a.info || {};
+      lines.push(`GPU: ${i.vendor || "?"} ${i.architecture || ""} ${i.device || ""} ${i.description || ""}`.trim());
+      lines.push("maxBufferSize " + a.limits.maxBufferSize + ", maxStorageBufferBinding " + a.limits.maxStorageBufferBindingSize);
+      lines.push("features: " + [...a.features].join(", "));
+    }
+  } catch (e) { lines.push("WebGPU: " + e.message); }
+  $("info").textContent = lines.join("\n");
+})();
+</script>
+</body>
+</html>
