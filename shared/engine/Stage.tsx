@@ -1,5 +1,6 @@
 "use client";
 
+import { logEvent, recentLog, startLog } from "./log";
 import { Canvas, extend, useFrame, useThree, type ThreeToJSXElements } from "@react-three/fiber";
 import { Component, createContext, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three/webgpu";
@@ -284,6 +285,8 @@ const setLite = (day: CodevemberDay, on: boolean) => {
 let renders = 0;
 function crumb(text: string) {
   (globalThis as Record<string, unknown>).__cvCrumb = text;
+  // The last of these is kept separately above; the log keeps only the steps that are not one of dozens.
+  if (!/^(hand shader|build shader|draw frame)/.test(text) || /draw frame [123]$/.test(text)) logEvent(text);
   try {
     window.localStorage.setItem("cv-crumb", `${text} (${Math.round(performance.now() / 100) / 10} s)`);
   } catch {}
@@ -333,7 +336,10 @@ async function graphicsReport() {
 export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (step: LoadStep) => void }) {
   const [loaded, setLoaded] = useState<LoadedDay | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lite] = useState(() => isLite(day));
+  const [lite] = useState(() => {
+    startLog(`day ${day.day} ${day.word}`);
+    return isLite(day);
+  });
   // Tells the standalone pages' material swap (HTML5/_build/three-webgpu.ts) whether this visit is a light one.
   (globalThis as Record<string, unknown>).__cvLite = lite;
   const [lost, setLost] = useState(false);
@@ -369,6 +375,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
       const rank = LOAD_ORDER.indexOf(step);
       if (step !== "swap" && rank < reached.current) return;
       reached.current = rank;
+      logEvent(`load step: ${step}`);
       onStep(step);
     },
     [onStep]
@@ -445,6 +452,8 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
               throw failure;
             }
             trace(made);
+            const backend = made.backend as unknown as { isWebGLBackend?: boolean; device?: { limits?: { maxStorageBufferBindingSize?: number }; features?: Set<string> } };
+            logEvent(`renderer ready: ${backend.isWebGLBackend ? "WebGL2" : "WebGPU"} (asked for ${forceWebGL ? "WebGL2" : "WebGPU"}${device ? ", own device with no optional features" : ""}), lighter mode ${lite ? "on" : "off"}`);
             return made;
           };
           // Phones can refuse WebGPU when short of memory. The WebGL backend often still gets through, and when neither
@@ -457,6 +466,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
               found = await make(webglFirst);
             } catch (failure) {
               console.error(failure);
+              logEvent(`renderer start failed (${webglFirst ? "WebGL2" : "WebGPU"}): ${String((failure as Error)?.message ?? failure).slice(0, 160)}`);
               try {
                 found = await make(!webglFirst);
               } catch (again) {
@@ -543,6 +553,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
       {error ? (
         <div className="cv-error" role="alert">
           <p>{error}</p>
+          <pre className="cv-errlog">{recentLog(7).join("\n")}</pre>
           {lost ? (
             <button type="button" className="cv-pill" onClick={() => window.location.reload()}>
               {lite ? "Try again" : "Open in lighter mode"}

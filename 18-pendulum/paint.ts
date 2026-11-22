@@ -1,6 +1,8 @@
 import * as THREE from "three/webgpu";
-import { Fn, If, Loop, exp, float, instanceIndex, instancedArray, int, max, min, uniform, uniformArray, vec2, vec4 } from "three/tsl";
+import { Fn, If, Loop, exp, float, instanceIndex, instancedArray, int, max, min, storage, uniform, uniformArray, vec2, vec4 } from "three/tsl";
 import { CANVAS } from "./pendulum";
+import { createCpuPaint } from "./paintCpu";
+import { logEvent } from "../shared/engine/log";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL's node types do not model every operator. */
 
@@ -21,12 +23,15 @@ export const LANDINGS = 96;
 const STEP = 1 / 240;
 
 // A square of paint SIZE wide: the canvas, or the floor round it.
-export function createPaint(N: number, SIZE = CANVAS) {
+export function createPaint(N: number, SIZE = CANVAS, webgl = false) {
   const CELLS = N * N;
   const CELL = SIZE / N;
   // Per column: thickness in metres, and the paint's colour; how wet it is (0 to 1) and how freshly it landed.
   const cells = instancedArray(CELLS, "vec4");
   const wet = instancedArray(CELLS, "vec4");
+  // What the picture reads. On WebGL2 a shader can only read a buffer through a texture made from it (a pixel buffer),
+  // which three builds for a read-only view of the same data.
+  const see = (buffer: any) => (webgl ? storage(buffer.value, "vec4", CELLS).setPBO(true).toReadOnly() : buffer);
   const next = instancedArray(CELLS, "vec4");
   const nextWet = instancedArray(CELLS, "vec4");
   // How much leaves each column toward -x, +x, -z and +z this step.
@@ -156,7 +161,35 @@ export function createPaint(N: number, SIZE = CANVAS) {
   })().compute(CELLS);
 
   // Paint the frame's landings (this.landings filled by the scene), then let it flow.
+  let cpu: ((flows: number) => boolean) | null = null;
+  let steps = 0;
+  let spent = 0;
+  let firstLanding = false;
   const step = (renderer: THREE.WebGPURenderer, flows: number) => {
+    // On WebGL2 the passes below cannot run (they read and write the same columns), so the processor does them.
+    if ((renderer as any).backend?.isWebGLBackend) {
+      cpu ??= createCpuPaint({ N, SIZE, CELL, REF, STEP, cellsAttr: (cells as any).value, wetAttr: (wet as any).value, u: u as any });
+      const began = performance.now();
+      const changed = cpu(flows);
+      if (changed) {
+        // The picture reads the paint through a texture made from each array: it is that texture that needs refreshing.
+        for (const store of [(cells as any).value, (wet as any).value]) {
+          if (store.pbo) store.pbo.needsUpdate = true;
+          else store.needsUpdate = true;
+        }
+      }
+      spent += performance.now() - began;
+      steps++;
+      const first = !firstLanding && u.count.value > 0;
+      if (first) firstLanding = true;
+      if (steps % 240 === 1 || first || (firstLanding && steps % 60 === 1 && steps < 600)) {
+        let thick = 0;
+        const data = (cells as any).value.array as Float32Array;
+        for (let o = 0; o < data.length; o += 4) thick += data[o];
+        logEvent(`paint on the processor (${SIZE === CANVAS ? "canvas" : "floor"} ${N}x${N}): step ${steps}, ${(spent / steps).toFixed(2)} ms a step, ${(thick * 1e6).toFixed(1)} cm3 on it, ${u.count.value} landings this frame`);
+      }
+      return;
+    }
     const passes: THREE.ComputeNode[] = [];
     if (u.count.value > 0) passes.push(land);
     for (let k = 0; k < flows; k++) passes.push(flow, settle, copy);
@@ -164,9 +197,14 @@ export function createPaint(N: number, SIZE = CANVAS) {
   };
 
   // Run once while loading, landings and all, so no pass has its pipeline built for the first time mid-visit.
-  const warm = (renderer: THREE.WebGPURenderer) => renderer.compute([land, flow, settle, copy] as any);
+  const warm = (renderer: THREE.WebGPURenderer) => {
+    if ((renderer as any).backend?.isWebGLBackend) return;
+    renderer.compute([land, flow, settle, copy] as any);
+  };
 
-  return { N, SIZE, CELL, cells, wet, u, step, warm };
+  const made = { N, SIZE, CELL, cells: see(cells) as typeof cells, wet: see(wet) as typeof wet, u, step, warm };
+  ((globalThis as any).__cvPaints ??= []).push(made);
+  return made;
 }
 
 export type Paint = ReturnType<typeof createPaint>;

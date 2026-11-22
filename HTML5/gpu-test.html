@@ -20,6 +20,8 @@
 <div id="warn"></div>
 <button id="all">Run all</button><button id="reset">Clear results</button>
 <div id="rows"></div>
+<p>Event log (newest last) <button id="copy">Copy</button> <button id="clearlog">Clear</button></p>
+<pre id="evlog">none</pre>
 <p>Last crashes seen on the days</p>
 <pre id="log">none</pre>
 <p>Last step before a crash</p>
@@ -150,6 +152,10 @@ $("reset").onclick = () => { state = {}; save(state); $("warn").innerHTML = ""; 
 draw();
 try { const l = JSON.parse(localStorage.getItem("cv-crashlog") || "[]"); if (l.length) $("log").textContent = l.join("\n"); } catch {}
 
+const showLog = () => { try { const l = JSON.parse(localStorage.getItem("cv-log") || "[]"); $("evlog").textContent = l.length ? l.slice(-70).join("\n") : "none"; } catch {} };
+showLog();
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText($("evlog").textContent + "\n\n" + $("log").textContent + "\n\n" + $("crumb").textContent + "\n\n" + $("info").textContent); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select the text instead"; } };
+$("clearlog").onclick = () => { try { localStorage.removeItem("cv-log"); localStorage.removeItem("cv-crashlog"); localStorage.removeItem("cv-crumb"); } catch {} showLog(); $("log").textContent = "none"; $("crumb").textContent = "none"; };
 try { const c = localStorage.getItem("cv-crumb"); if (c) $("crumb").textContent = c; } catch {}
 
 (async () => {
