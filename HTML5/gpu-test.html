@@ -22,6 +22,8 @@
 <div id="rows"></div>
 <p>Last crashes seen on the days</p>
 <pre id="log">none</pre>
+<p>Last shader handed to the graphics</p>
+<pre id="crumb">none</pre>
 <p>Phone info</p>
 <pre id="info">…</pre>
 <script>
@@ -147,6 +149,8 @@ $("all").onclick = async () => { for (let i = 0; i < TESTS.length; i++) { await 
 $("reset").onclick = () => { state = {}; save(state); $("warn").innerHTML = ""; draw(); };
 draw();
 try { const l = JSON.parse(localStorage.getItem("cv-crashlog") || "[]"); if (l.length) $("log").textContent = l.join("\n"); } catch {}
+
+try { const c = localStorage.getItem("cv-crumb"); if (c) $("crumb").textContent = c; } catch {}
 
 (async () => {
   const lines = [navigator.userAgent];

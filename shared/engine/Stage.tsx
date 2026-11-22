@@ -81,6 +81,13 @@ function buildInBackground(gl: THREE.WebGPURenderer, count: { pending: number; l
     }
   };
   pipelines.updateForRender = (renderObject) => {
+    // Written down before each shader is handed to the driver, so a crash can say which one was last.
+    try {
+      const o = renderObject as { material?: { type?: string; name?: string }; object?: { name?: string; type?: string; parent?: { name?: string } | null } };
+      const crumb = `${o.material?.type ?? "?"}${o.material?.name ? ` "${o.material.name}"` : ""} on ${o.object?.type ?? "?"}${o.object?.name ? ` "${o.object.name}"` : ""} in "${o.object?.parent?.name ?? ""}"`;
+      (globalThis as Record<string, unknown>).__cvCrumb = crumb;
+      window.localStorage.setItem("cv-crumb", crumb);
+    } catch {}
     pipelines.getForRender(renderObject, tracker);
   };
   let released = false;
@@ -452,7 +459,8 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
             setLite(day, true);
             setLost(true);
             // Where in the visit it happened, kept for the test page and shown below the message.
-            const where = `day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
+            const crumb = String((globalThis as Record<string, unknown>).__cvCrumb ?? "none");
+            const where = `last shader: ${crumb}; day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
             try {
               const log = JSON.parse(window.localStorage.getItem("cv-crashlog") || "[]");
               log.push(`${where}: ${info.message.slice(0, 120)}`);

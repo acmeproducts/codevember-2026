@@ -79,8 +79,20 @@ function Scene() {
 
   // Every compute pass run once now, behind the loader, rather than first at the first toss.
   useEffect(() => {
-    paint.warm(gl);
-    spilt.warm(gl);
+    // In lighter mode on a phone, after the scene's own shaders are built rather than alongside them: the phone's driver
+    // has gone down while both were being compiled at once.
+    const lighter = Boolean((globalThis as Record<string, unknown>).__cvLite);
+    let timer = 0;
+    const go = () => {
+      if (lighter && scenePhase.current === "hold") {
+        timer = window.setTimeout(go, 250);
+        return;
+      }
+      paint.warm(gl);
+      spilt.warm(gl);
+    };
+    go();
+    return () => window.clearTimeout(timer);
   }, [paint, spilt, gl]);
   // The save, once the whole studio is up and drawing behind the loader: its first press then costs no more than any.
   const savePrepared = useRef(false);
