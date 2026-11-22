@@ -298,6 +298,8 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
   const [loaded, setLoaded] = useState<LoadedDay | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lite] = useState(() => isLite(day));
+  // Tells the standalone pages' material swap (HTML5/_build/three-webgpu.ts) whether this visit is a light one.
+  (globalThis as Record<string, unknown>).__cvLite = lite;
   const [lost, setLost] = useState(false);
   const shrink = lite && WEBGPU_ONLY.includes(day.day);
   const [choice, setChoice] = useState<QualityChoice>(shrink ? "low" : "auto");

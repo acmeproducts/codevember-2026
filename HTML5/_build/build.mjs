@@ -30,6 +30,10 @@ const standalone = (slug) => ({
   name: "standalone",
   setup(b) {
     b.onResolve({ filter: /^next\/(link|navigation|dynamic)$/ }, (args) => ({ path: join(here, `next-${args.path.slice(5)}.ts${args.path.endsWith("navigation") ? "" : "x"}`) }));
+    // three/webgpu goes through a wrapper that can swap the heavy "physical" material for a lighter one on a phone.
+    const real = join(root, "node_modules/three/build/three.webgpu.js");
+    b.onResolve({ filter: /^three\/webgpu$/ }, (args) => (args.importer.endsWith("three-webgpu.ts") ? { path: real } : { path: join(here, "three-webgpu.ts") }));
+    b.onResolve({ filter: /^THREE_WEBGPU_REAL$/ }, () => ({ path: real }));
     b.onLoad({ filter: /\.tsx?$/ }, (args) => {
       if (args.path.includes("node_modules")) return;
       let contents = readFileSync(args.path, "utf8");
