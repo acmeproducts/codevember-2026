@@ -83,10 +83,7 @@ function buildInBackground(gl: THREE.WebGPURenderer, count: { pending: number; l
   pipelines.updateForRender = (renderObject) => {
     // Written down before each shader is handed to the driver, so a crash can say which one was last.
     try {
-      const o = renderObject as { material?: { type?: string; name?: string }; object?: { name?: string; type?: string; parent?: { name?: string } | null } };
-      const crumb = `${o.material?.type ?? "?"}${o.material?.name ? ` "${o.material.name}"` : ""} on ${o.object?.type ?? "?"}${o.object?.name ? ` "${o.object.name}"` : ""} in "${o.object?.parent?.name ?? ""}"`;
-      (globalThis as Record<string, unknown>).__cvCrumb = crumb;
-      window.localStorage.setItem("cv-crumb", crumb);
+      crumb(`hand shader to the driver: ${nameOf(renderObject as never)}`);
     } catch {}
     pipelines.getForRender(renderObject, tracker);
   };
@@ -282,6 +279,38 @@ const setLite = (day: CodevemberDay, on: boolean) => {
   } catch {}
 };
 
+// Notes the step the page is on, before it is taken, so that a crash can say what it was doing. Kept in the page and on
+// the device (the test page shows it), since a crash that takes the browser's graphics down can leave nothing else.
+let renders = 0;
+function crumb(text: string) {
+  (globalThis as Record<string, unknown>).__cvCrumb = text;
+  try {
+    window.localStorage.setItem("cv-crumb", `${text} (${Math.round(performance.now() / 100) / 10} s)`);
+  } catch {}
+}
+const nameOf = (o: { material?: { type?: string; name?: string }; object?: { name?: string; type?: string } } | undefined) =>
+  `${o?.material?.type ?? "?"}${o?.material?.name ? ` "${o.material.name}"` : ""} on ${o?.object?.type ?? "?"}${o?.object?.name ? ` "${o.object.name}"` : ""}`;
+
+// Wraps the renderer's own steps with those notes.
+function trace(renderer: THREE.WebGPURenderer) {
+  const r = renderer as unknown as Record<string, any>;
+  const wrap = (owner: Record<string, any> | undefined, name: string, label: (args: any[]) => string | null) => {
+    const original = owner?.[name];
+    if (!owner || typeof original !== "function") return;
+    owner[name] = function (this: unknown, ...args: any[]) {
+      const text = label(args);
+      if (text) crumb(text);
+      return original.apply(this, args);
+    };
+  };
+  wrap(r, "compileAsync", () => "compile the scene");
+  wrap(r, "compute", (a) => `compute ${[].concat(a[0]).map((n: any) => n?.name || n?.constructor?.name || "pass").join(", ")}`);
+  wrap(r, "render", () => (++renders <= 40 ? `draw frame ${renders}` : null));
+  wrap(r._nodes, "getForRender", (a) => `build shader code: ${nameOf(a[0])}`);
+  wrap(r._nodes, "getForCompute", (a) => `build compute shader code: ${a[0]?.name || a[0]?.constructor?.name || ""}`);
+  wrap(r._pipelines, "getForCompute", (a) => `hand compute to the driver: ${a[0]?.name || a[0]?.constructor?.name || ""}`);
+}
+
 // Why no renderer could be started, in words for whoever is holding the phone.
 async function graphicsReport() {
   let webgpu = "not offered";
@@ -415,6 +444,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
               } catch {}
               throw failure;
             }
+            trace(made);
             return made;
           };
           // Phones can refuse WebGPU when short of memory. The WebGL backend often still gets through, and when neither
@@ -459,8 +489,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
             setLite(day, true);
             setLost(true);
             // Where in the visit it happened, kept for the test page and shown below the message.
-            const crumb = String((globalThis as Record<string, unknown>).__cvCrumb ?? "none");
-            const where = `last shader: ${crumb}; day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
+            const where = `last step: ${String((globalThis as Record<string, unknown>).__cvCrumb ?? "none")}; day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
             try {
               const log = JSON.parse(window.localStorage.getItem("cv-crashlog") || "[]");
               log.push(`${where}: ${info.message.slice(0, 120)}`);
