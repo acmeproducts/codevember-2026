@@ -1,6 +1,6 @@
 "use client";
 
-import { logEvent, recentLog, startLog } from "./log";
+import { logEvent, recentLog, startLog, BUILD, probeGraphics } from "./log";
 import { Canvas, extend, useFrame, useThree, type ThreeToJSXElements } from "@react-three/fiber";
 import { Component, createContext, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three/webgpu";
@@ -291,8 +291,8 @@ function crumb(text: string) {
     window.localStorage.setItem("cv-crumb", `${text} (${Math.round(performance.now() / 100) / 10} s)`);
   } catch {}
 }
-const nameOf = (o: { material?: { type?: string; name?: string }; object?: { name?: string; type?: string } } | undefined) =>
-  `${o?.material?.type ?? "?"}${o?.material?.name ? ` "${o.material.name}"` : ""} on ${o?.object?.type ?? "?"}${o?.object?.name ? ` "${o.object.name}"` : ""}`;
+const nameOf = (o: { material?: { type?: string; name?: string }; object?: { name?: string; type?: string }; geometry?: { type?: string; attributes?: { position?: { count?: number } } } } | undefined) =>
+  `${o?.material?.type ?? "?"}${o?.material?.name ? ` "${o.material.name}"` : ""} on ${o?.object?.type ?? "?"}${o?.object?.name ? ` "${o.object.name}"` : ""} [${o?.geometry?.type ?? "?"}, ${o?.geometry?.attributes?.position?.count ?? "?"} points]`;
 
 // Wraps the renderer's own steps with those notes.
 function trace(renderer: THREE.WebGPURenderer) {
@@ -312,6 +312,40 @@ function trace(renderer: THREE.WebGPURenderer) {
   wrap(r._nodes, "getForRender", (a) => `build shader code: ${nameOf(a[0])}`);
   wrap(r._nodes, "getForCompute", (a) => `build compute shader code: ${a[0]?.name || a[0]?.constructor?.name || ""}`);
   wrap(r._pipelines, "getForCompute", (a) => `hand compute to the driver: ${a[0]?.name || a[0]?.constructor?.name || ""}`);
+}
+
+// On WebGL2: every shader program is written down as it is handed to the driver, one at a time, so the log's last line
+// names the one a crash happened on.
+function watchGL(renderer: THREE.WebGPURenderer) {
+  const backend = renderer.backend as unknown as { isWebGLBackend?: boolean; gl?: WebGL2RenderingContext; parallel?: unknown };
+  const gl = backend.gl;
+  if (!backend.isWebGLBackend || !gl) return;
+  // One at a time rather than many at once: gentler on a phone's driver, and the log stays in order.
+  backend.parallel = null;
+  const sizes = new WeakMap<object, number>();
+  const parts = new WeakMap<object, number[]>();
+  const source = gl.shaderSource.bind(gl);
+  gl.shaderSource = (shader, text) => {
+    sizes.set(shader, text.length);
+    source(shader, text);
+  };
+  const attach = gl.attachShader.bind(gl);
+  gl.attachShader = (program, shader) => {
+    parts.set(program, [...(parts.get(program) ?? []), sizes.get(shader) ?? 0]);
+    attach(program, shader);
+  };
+  const link = gl.linkProgram.bind(gl);
+  let count = 0;
+  gl.linkProgram = (program) => {
+    const began = performance.now();
+    const what = String((globalThis as Record<string, unknown>).__cvCrumb ?? "").replace(/^[^:]*: /, "");
+    logEvent(`shader ${++count} to driver: ${what} (${(parts.get(program) ?? []).join(" + ")} chars)`);
+    link(program);
+    // Asking for the result makes the driver finish before the next one starts.
+    const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
+    const lostNow = gl.isContextLost();
+    if (lostNow || !ok) logEvent(`shader ${count} ${lostNow ? "took the graphics down" : `failed: ${String(gl.getProgramInfoLog(program)).slice(0, 150)}`} (${Math.round(performance.now() - began)} ms)`);
+  };
 }
 
 // Why no renderer could be started, in words for whoever is holding the phone.
@@ -452,6 +486,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
               throw failure;
             }
             trace(made);
+            watchGL(made);
             const backend = made.backend as unknown as { isWebGLBackend?: boolean; device?: { limits?: { maxStorageBufferBindingSize?: number }; features?: Set<string> } };
             logEvent(`renderer ready: ${backend.isWebGLBackend ? "WebGL2" : "WebGPU"} (asked for ${forceWebGL ? "WebGL2" : "WebGPU"}${device ? ", own device with no optional features" : ""}), lighter mode ${lite ? "on" : "off"}`);
             return made;
@@ -498,6 +533,7 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
             if (leaving) return;
             setLite(day, true);
             setLost(true);
+            logEvent(`check: ${probeGraphics()}`);
             // Where in the visit it happened, kept for the test page and shown below the message.
             const where = `last step: ${String((globalThis as Record<string, unknown>).__cvCrumb ?? "none")}; day ${day.day}, ${lite ? "lighter" : "full"} mode, at "${LOAD_ORDER[reached.current] ?? "start"}" (${scenePhase.current}), ${Math.round(performance.now() / 1000)} s in`;
             try {
@@ -571,7 +607,20 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
       {error ? (
         <div className="cv-error" role="alert">
           <p>{error}</p>
-          <pre className="cv-errlog">{recentLog(7).join("\n")}</pre>
+          <pre className="cv-errlog">{`build ${BUILD}\n${recentLog(16).join("\n")}`}</pre>
+          <button
+            type="button"
+            className="cv-pill"
+            onClick={(event) => {
+              const button = event.currentTarget;
+              navigator.clipboard?.writeText(`build ${BUILD}\n${recentLog(200).join("\n")}`).then(
+                () => (button.textContent = "Copied"),
+                () => (button.textContent = "Could not copy")
+              );
+            }}
+          >
+            Copy full log
+          </button>
           {lost ? (
             <button type="button" className="cv-pill" onClick={() => window.location.reload()}>
               {lite ? "Try again" : "Open in lighter mode"}

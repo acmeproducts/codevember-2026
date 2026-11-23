@@ -60,7 +60,7 @@ async function page(entry, slug, title, description) {
     jsx: "automatic",
     legalComments: "none",
     tsconfig: join(root, "tsconfig.json"),
-    define: { "process.env.NODE_ENV": '"production"', __SLUG__: JSON.stringify(slug ?? "") },
+    define: { "process.env.NODE_ENV": '"production"', __SLUG__: JSON.stringify(slug ?? ""), __CV_BUILD__: JSON.stringify(new Date().toLocaleString("sv-SE", { timeZone: "America/Los_Angeles" }).slice(0, 16) + " PT") },
     plugins: [standalone(slug)],
     logLevel: "warning"
   });
