@@ -41,13 +41,15 @@ const done = {
 
 function Scene() {
   const { tier } = useQuality();
-  const webgl = Boolean((useThree((state) => state.gl) as unknown as { backend?: { isWebGLBackend?: boolean } }).backend?.isWebGLBackend);
+  const backend = (useThree((state) => state.gl) as unknown as { backend?: { isWebGLBackend?: boolean; extensions?: { has(name: string): boolean } } }).backend;
+  const webgl = Boolean(backend?.isWebGLBackend);
+  const smooth = Boolean(backend?.extensions?.has("OES_texture_float_linear"));
   // The grid is set by the tier the visit starts on: a later step down must not wipe the painting.
   const startTier = useRef(tier).current;
   const N = startTier === "high" ? 640 : startTier === "medium" ? 448 : 288;
-  const paint = useMemo(() => createPaint(N, undefined, webgl), [N]);
+  const paint = useMemo(() => createPaint(N, undefined, webgl, smooth), [N]);
   // The floor round it, coarser over its much larger square (about a centimetre a column on High).
-  const spilt = useMemo(() => createPaint(Math.round(N * 0.75), FLOOR, webgl), [N]);
+  const spilt = useMemo(() => createPaint(Math.round(N * 0.75), FLOOR, webgl, smooth), [N]);
   // Swaying gently when the studio comes up, waiting to be thrown: nothing pours until the visitor gives it a toss.
   const pendulum = useMemo(() => {
     const p = new Pendulum();

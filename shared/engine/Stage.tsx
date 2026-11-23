@@ -505,12 +505,30 @@ export default function Stage({ day, onStep }: { day: CodevemberDay; onStep: (st
               log.push(`${where}: ${info.message.slice(0, 120)}`);
               window.localStorage.setItem("cv-crashlog", JSON.stringify(log.slice(-8)));
             } catch {}
+            // Try again by itself, twice, before asking anything of the visitor: a fresh page often gets its graphics back.
+            try {
+              const key = `cv-retry-${day.day}`;
+              const tries = Number(window.sessionStorage.getItem(key) || "0");
+              if (tries < 2) {
+                window.sessionStorage.setItem(key, String(tries + 1));
+                logEvent(`graphics lost; reloading by itself (try ${tries + 1} of 2)`);
+                window.setTimeout(() => window.location.reload(), 1200);
+                return;
+              }
+              window.sessionStorage.removeItem(key);
+            } catch {}
             setError(
               lite
                 ? `This phone's graphics gave out again, even in the lighter mode (${where}). Close and reopen the browser, then try once more.`
                 : `This phone's graphics gave out on this scene (${where}). It will open in a lighter mode next.`
             );
           };
+          // Twenty seconds without trouble counts as a good visit: the next loss starts its tries afresh.
+          window.setTimeout(() => {
+            try {
+              if (!leaving) window.sessionStorage.removeItem(`cv-retry-${day.day}`);
+            } catch {}
+          }, 20000);
           setIsWebGPU((renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend === true);
           return renderer as never;
         }}

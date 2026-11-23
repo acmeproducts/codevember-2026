@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three/webgpu";
-import { attribute, cameraPosition, color, cos, float, int, max, min, mix, mx_noise_float, normalize, output, positionWorld, sin, smoothstep, transformNormalToView, uniform, varying, vec2, vec3, vec4, vertexIndex } from "three/tsl";
+import { attribute, cameraPosition, color, cos, float, int, max, min, mix, mx_noise_float, normalize, output, positionWorld, sin, smoothstep, texture, transformNormalToView, uv, uniform, varying, vec2, vec3, vec4, vertexIndex } from "three/tsl";
 import { useDispose } from "../shared/engine/dispose";
 import type { Paint } from "./paint";
 import { CANVAS, FACE, type Pendulum, STAND, STRETCHER } from "./pendulum";
@@ -72,29 +72,34 @@ export function Canvas({ paint, ground, floor = false }: { paint: Paint; ground:
   const tone = useMemo(() => uniform(new THREE.Color(canvasColours.black)), []);
   tone.value.set(ground);
   const { mesh, frame, geometries, materials } = useMemo(() => {
-    const { N, SIZE, CELL, cells, wet } = paint;
+    const { N, SIZE, CELL, cells, wet, maps } = paint;
     const lift = floor ? 0.0008 : FACE;
     // One vertex a column, each sitting over its column's middle.
-    const geometry = new THREE.PlaneGeometry(SIZE - CELL, SIZE - CELL, N - 1, N - 1);
+    const geometry = maps ? new THREE.PlaneGeometry(SIZE - CELL, SIZE - CELL, 1, 1) : new THREE.PlaneGeometry(SIZE - CELL, SIZE - CELL, N - 1, N - 1);
     geometry.rotateX(-Math.PI / 2);
     const id = int(vertexIndex);
     const i = id.mod(N);
     const j = id.div(N);
     const clampI = (k: any) => (max as any)((min as any)(k, int(N - 1)), int(0));
-    const heightAt = (a: any, b: any) => cells.element(clampI(b).mul(N).add(clampI(a))).x.mul(RELIEF) as any;
-    const own = cells.element(id) as any;
-    const h = own.x.mul(RELIEF) as any;
+    // On WebGL2 the paint comes as textures, read where the picture is coloured in; the canvas itself stays flat.
+    const spot = maps ? (vec2((uv() as any).x.mul(N - 1).add(0.5).div(N), float(1).sub((uv() as any).y).mul(N - 1).add(0.5).div(N)) as any) : null;
+    const read = (da: number, db: number) => texture(maps!.cells, spot.add(vec2(da / N, db / N))) as any;
+    const heightAt = maps ? null : (a: any, b: any) => cells.element(clampI(b).mul(N).add(clampI(a))).x.mul(RELIEF) as any;
+    const own = (maps ? read(0, 0) : cells.element(id)) as any;
+    const h = (maps ? float(0) : own.x.mul(RELIEF)) as any;
     const base = attribute("position", "vec3") as any;
     const material = new THREE.MeshPhysicalNodeMaterial({ roughness: 0.85, metalness: 0, clearcoatRoughness: 0.08 });
     material.positionNode = vec3(base.x, h.add(lift), base.z) as any;
     // The slope from the columns either side.
-    const dx = heightAt(i.add(1), j).sub(heightAt(i.sub(1), j)).div(CELL * 2) as any;
-    const dz = heightAt(i, j.add(1)).sub(heightAt(i, j.sub(1))).div(CELL * 2) as any;
-    const normal = varying(normalize(vec3(dx.negate(), 1, dz.negate()))) as any;
-    const paintColour = varying(own.yzw) as any;
-    const thick = varying(own.x) as any;
-    const wetness = varying(wet.element(id).x) as any;
-    const fresh = varying(wet.element(id).y) as any;
+    const dx = (maps ? read(1, 0).x.sub(read(-1, 0).x).mul(RELIEF) : heightAt!(i.add(1), j).sub(heightAt!(i.sub(1), j))).div(CELL * 2) as any;
+    const dz = (maps ? read(0, 1).x.sub(read(0, -1).x).mul(RELIEF) : heightAt!(i, j.add(1)).sub(heightAt!(i, j.sub(1)))).div(CELL * 2) as any;
+    const slope = normalize(vec3(dx.negate(), 1, dz.negate())) as any;
+    const normal = (maps ? slope : varying(slope)) as any;
+    const paintColour = (maps ? own.yzw : varying(own.yzw)) as any;
+    const thick = (maps ? own.x : varying(own.x)) as any;
+    const dampness = maps ? (texture(maps.wet, spot) as any) : null;
+    const wetness = (maps ? dampness.x : varying(wet.element(id).x)) as any;
+    const fresh = (maps ? dampness.y : varying(wet.element(id).y)) as any;
 
     // Bare canvas: a fine weave, faded out where it would be smaller than a pixel; paint covers it as it thickens.
     const p = positionWorld as any;
