@@ -171,7 +171,7 @@ function shell(
 // Finished paintings leaning on the walls.
 function leaning(k: ReturnType<typeof kit>, spots: [number, number, number, number, number][], seed: number) {
   spots.forEach(([x, z, turn, size, lean], n) => {
-    const art = painting(1024, seed + n * 17);
+    const art = painting(lighter() ? 512 : 1024, seed + n * 17);
     k.textures.push(art);
     const face = k.mat(new THREE.MeshStandardNodeMaterial({ roughness: 0.55 }));
     face.colorNode = texture(art).rgb as any;
@@ -192,7 +192,7 @@ function sun(k: ReturnType<typeof kit>, colour: string, intensity: number, from:
   light.position.set(...from);
   light.target.position.set(0, 0, 0);
   light.castShadow = true;
-  light.shadow.mapSize.set(2048, 2048);
+  light.shadow.mapSize.set(lighter() ? 1024 : 2048, lighter() ? 1024 : 2048);
   const c = light.shadow.camera;
   c.left = c.bottom = -7;
   c.right = c.top = 7;
@@ -206,7 +206,10 @@ function sun(k: ReturnType<typeof kit>, colour: string, intensity: number, from:
 }
 
 // Paint on a floor, drawn once: the spill texture laid across the room.
-function spillOn(k: ReturnType<typeof kit>, size: number, seed: number, colours?: string[]) {
+// In the lighter mode the room's pictures are made at half size: a quarter of the graphics memory, barely visible.
+const lighter = () => Boolean((globalThis as { __cvLite?: boolean }).__cvLite);
+function spillOn(k: ReturnType<typeof kit>, full: number, seed: number, colours?: string[]) {
+  const size = lighter() ? Math.min(full, 2048) : full;
   const t = spills(size, seed, colours);
   k.textures.push(t);
   const across = positionWorld.xz.div(ROOM.width).add(0.5) as any;

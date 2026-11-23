@@ -322,6 +322,38 @@ function watchGL(renderer: THREE.WebGPURenderer) {
   if (!backend.isWebGLBackend || !gl) return;
   // One at a time rather than many at once: gentler on a phone's driver, and the log stays in order.
   backend.parallel = null;
+  // Many copies of one shape (the aim dots, beads of paint, dust) are placed by a table of positions. Handing that table
+  // to the shader as one block of numbers crashed a Galaxy S23's driver the moment the shader was built; given as plain
+  // per-copy attributes, the oldest way there is, it does not.
+  const capabilities = (backend as unknown as { capabilities?: { maxUniformBlockSize: number | null } }).capabilities;
+  if (capabilities) {
+    logEvent(`uniform block limit ${gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE)} bytes: not used for copies' positions`);
+    capabilities.maxUniformBlockSize = 0;
+  }
+  // What the page asks the graphics card to hold, added up, so a crash from running out of room shows as one.
+  let held = 0;
+  const took = (what: string, width: number, height: number, layers = 1) => {
+    const bytes = width * height * layers * 4;
+    held += bytes;
+    if (bytes >= 4e6) logEvent(`graphics memory: ${what} ${width}x${height}${layers > 1 ? `x${layers}` : ""}, about ${Math.round(bytes / 1e6)} MB; ${Math.round(held / 1e6)} MB asked for so far`);
+  };
+  const g = gl as unknown as Record<string, (...args: any[]) => unknown>;
+  for (const [name, read] of [
+    ["texStorage2D", (a: any[]) => [a[3], a[4], 1]],
+    ["texStorage3D", (a: any[]) => [a[3], a[4], a[5]]],
+    ["texImage2D", (a: any[]) => (a.length >= 9 ? [a[3], a[4], 1] : [a[5]?.width ?? 0, a[5]?.height ?? 0, 1])],
+    ["renderbufferStorage", (a: any[]) => [a[2], a[3], 1]],
+    ["renderbufferStorageMultisample", (a: any[]) => [a[3], a[4], a[1] || 1]]
+  ] as const) {
+    const original = g[name].bind(gl);
+    g[name] = (...args: any[]) => {
+      try {
+        const [w, h, d] = read(args);
+        took(name, w, h, d);
+      } catch {}
+      return original(...args);
+    };
+  }
   const sizes = new WeakMap<object, number>();
   const parts = new WeakMap<object, number[]>();
   const source = gl.shaderSource.bind(gl);
@@ -337,6 +369,10 @@ function watchGL(renderer: THREE.WebGPURenderer) {
   const link = gl.linkProgram.bind(gl);
   let count = 0;
   gl.linkProgram = (program) => {
+    if (gl.isContextLost()) {
+      logEvent("shader skipped: graphics already lost");
+      return;
+    }
     const began = performance.now();
     const what = String((globalThis as Record<string, unknown>).__cvCrumb ?? "").replace(/^[^:]*: /, "");
     logEvent(`shader ${++count} to driver: ${what} (${(parts.get(program) ?? []).join(" + ")} chars)`);

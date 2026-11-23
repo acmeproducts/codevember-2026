@@ -191,7 +191,7 @@ export function createPaint(N: number, SIZE = CANVAS, webgl = false, smooth = tr
         let thick = 0;
         const data = maps!.cells.image.data as Float32Array;
         for (let o = 0; o < data.length; o += 4) thick += data[o];
-        logEvent(`paint on the processor (${SIZE === CANVAS ? "canvas" : "floor"} ${N}x${N}): step ${steps}, ${(spent / steps).toFixed(2)} ms a step, ${(thick * 1e6).toFixed(1)} cm3 on it, ${u.count.value} landings this frame`);
+        logEvent(`paint on the processor (${SIZE === CANVAS ? "canvas" : "floor"} ${N}x${N}): step ${steps}, ${(spent / steps).toFixed(2)} ms a step, ${(thick * CELL * CELL * 1e6).toFixed(1)} cm3 on it, ${u.count.value} landings this frame`);
       }
       return;
     }

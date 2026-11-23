@@ -165,33 +165,46 @@ export function Canvas({ paint, ground, floor = false }: { paint: Paint; ground:
 // along its length, as a slingshot shows its aim.
 const DOTS = 120;
 export function Aim({ pendulum }: { pendulum: Pendulum }) {
-  const { mesh, geometry, material, points } = useMemo(() => {
-    const geometry = new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2);
+  const { mesh, geometry, material, points, disc, corners } = useMemo(() => {
+    // Every dot is part of one ordinary shape, moved by the processor each frame: nothing a phone's driver could trip on.
+    const disc = new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2);
+    const corners = disc.attributes.position.count;
+    const ring = disc.index!.array;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(DOTS * corners * 3), 3));
+    const index = new Uint16Array(DOTS * ring.length);
+    for (let k = 0; k < DOTS; k++) for (let e = 0; e < ring.length; e++) index[k * ring.length + e] = ring[e] + k * corners;
+    geometry.setIndex(new THREE.BufferAttribute(index, 1));
     const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     material.colorNode = color("#fff2d6").mul(0.9) as any;
-    const mesh = new THREE.InstancedMesh(geometry, material, DOTS);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
-    // One to start with, so it is built while loading; hidden from the first frame until the can is held.
-    mesh.count = 1;
     mesh.renderOrder = 5;
     const points = Array.from({ length: DOTS }, () => new THREE.Vector3());
-    return { mesh, geometry, material, points };
+    return { mesh, geometry, material, points, disc, corners };
   }, []);
-  useDispose(geometry, material);
-  const m = useMemo(() => new THREE.Matrix4(), []);
+  useDispose(geometry, material, disc);
   useFrame(() => {
+    const each = disc.index!.count;
     if (!pendulum.held) {
-      mesh.count = 0;
+      // All its dots sit folded at one point until the can is held.
+      if (geometry.drawRange.count !== each) geometry.setDrawRange(0, each);
       return;
     }
     const n = pendulum.predict(6, 12, points);
+    const shape = disc.attributes.position.array;
+    const out = geometry.attributes.position.array as Float32Array;
     for (let k = 0; k < n; k++) {
       const s = 0.006 * (1 - (k / DOTS) * 0.7);
-      m.makeScale(s, 1, s).setPosition(points[k].x, FACE + 0.012, points[k].z);
-      mesh.setMatrixAt(k, m);
+      for (let c = 0; c < corners; c++) {
+        const o = (k * corners + c) * 3;
+        out[o] = shape[c * 3] * s + points[k].x;
+        out[o + 1] = FACE + 0.012;
+        out[o + 2] = shape[c * 3 + 2] * s + points[k].z;
+      }
     }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
+    geometry.setDrawRange(0, n * each);
+    geometry.attributes.position.needsUpdate = true;
   });
   return <primitive object={mesh} />;
 }

@@ -17,9 +17,20 @@ function read(): string[] {
   }
 }
 
+// The same thing over and over is written three times and then only counted, so it cannot push the useful lines out.
+let lastKind = "";
+let repeats = 0;
 export function logEvent(text: string) {
   try {
     lines ??= read();
+    const kind = text.replace(/\d+/g, "#").replace(/\[.*?\]|\(.*?\)/g, "").slice(0, 60);
+    if (kind === lastKind) {
+      if (++repeats > 2) return;
+    } else {
+      if (repeats > 2) lines.push(`       (the line above repeated ${repeats - 2} more times)`);
+      lastKind = kind;
+      repeats = 0;
+    }
     const t = ((performance.now() - started) / 1000).toFixed(1).padStart(5);
     lines.push(`${t}s ${text}`.slice(0, 220));
     if (lines.length > MAX) lines.splice(0, lines.length - MAX);
