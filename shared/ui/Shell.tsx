@@ -6,6 +6,7 @@ import { Component, useState, type ReactNode } from "react";
 import { dayFromPath, type CodevemberDay } from "../days";
 import { withRetries } from "../engine/retry";
 import { Loader, type LoadStep } from "./Loader";
+import { BUILD, recentLog } from "../engine/log";
 
 const Stage = dynamic(() => withRetries(() => import("../engine/Stage")), { ssr: false });
 
@@ -52,6 +53,20 @@ export class CrashScreen extends Component<{ children: ReactNode }, { error: Err
         </button>
         <a href={"/"}>All days</a>
         <small>{error.message}</small>
+        <pre className="cv-errlog">{`build ${BUILD}\n${recentLog(16).join("\n")}`}</pre>
+        <button
+          type="button"
+          className="cv-pill"
+          onClick={(event) => {
+            const button = event.currentTarget;
+            navigator.clipboard?.writeText(`build ${BUILD}\n${error.message}\n${recentLog(200).join("\n")}`).then(
+              () => (button.textContent = "Copied"),
+              () => (button.textContent = "Could not copy")
+            );
+          }}
+        >
+          Copy full log
+        </button>
       </div>
     );
   }
